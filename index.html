@@ -435,6 +435,27 @@
   .trip-mode-btn-park{ background: #7C5CFC; }
   .trip-mode-btn-leave{ background: var(--gray); }
   .trip-mode-btn.active{ box-shadow: 0 0 0 2px rgba(255,255,255,0.65) inset; }
+  /* 주차장 기록/주차 기록 시작 버튼 — 선택 전엔 트립 태그 버튼(특수차량/어린이 등)과 같은 크기로
+     나란히 배치하고, 시작을 눌러 "정지" 상태가 되면(둘 중 하나만 남음) 주행 기록 시작 버튼만큼
+     크게 키워 전체 폭을 차지하게 한다 — 운전 중 정지 버튼을 더 쉽게 누르게 하기 위함. */
+  .trip-lotpark-grid{
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .trip-mode-btn-lot, .trip-mode-btn-park{
+    padding: 15px 4px;
+    min-height: 50px;
+    border-radius: 9px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .trip-mode-btn-lot.active, .trip-mode-btn-park.active{
+    grid-column: 1 / -1;
+    padding: 16px 8px;
+    min-height: 54px;
+    font-size: 17px;
+  }
   .trip-rest-timer{
     margin-top: 8px;
     padding: 8px 10px;
@@ -1057,8 +1078,10 @@
             <button type="button" class="btn-secondary" id="btnTripPass">경유 (주차 안 함 · 다음 목적지로)</button>
           </div>
           <div class="trip-mode-row" id="tripLotRow" style="display:none;">
-            <button type="button" class="trip-mode-btn trip-mode-btn-lot" id="btnLotRecord">🅿️ 주차장 기록 시작</button>
-            <button type="button" class="trip-mode-btn trip-mode-btn-park" id="btnParkRecord">🚙 주차 기록 시작</button>
+            <div class="trip-lotpark-grid">
+              <button type="button" class="trip-mode-btn trip-mode-btn-lot" id="btnLotRecord">🅿️ 주차장 기록 시작</button>
+              <button type="button" class="trip-mode-btn trip-mode-btn-park" id="btnParkRecord">🚙 주차 기록 시작</button>
+            </div>
             <button type="button" class="trip-mode-btn trip-mode-btn-leave" id="btnTripLeaveLot" style="display:none;">🚪 주차장에서 나옴 (다음 장소로 이동 시작)</button>
           </div>
           <div class="trip-rest-timer" id="tripLotRecordTimer" style="display:none;"></div>
@@ -1156,12 +1179,8 @@
     };
   }
 
-  // 이 기기(브라우저)의 localStorage는 도메인(jihwanseo-netizen.github.io) 단위로 공유돼서,
-  // 경로가 다른 parking-log-app과 RS4-app을 같은 폰에서 번갈아 열면 팀 코드/마지막 입력값/
-  // 로컬 캐시가 서로 섞일 수 있었다. RS4-app 쪽 키에만 고유 접두사를 붙여 완전히 분리한다.
-  var LS_PREFIX = 'rs4app_';
-  var STORAGE_KEY = LS_PREFIX + 'parking-spots';
-  var LOG_STORAGE_KEY = LS_PREFIX + 'logging-sessions';
+  var STORAGE_KEY = 'parking-spots';
+  var LOG_STORAGE_KEY = 'logging-sessions';
   var spots = [];
   var logs = [];
   // 저장된 로깅 기록(loadLogs)을 실제로 다 불러오기 전까진 false. 화면 버튼들은 HTML이라
@@ -1245,12 +1264,12 @@
   // 로깅 기록(logs)과 장소 체크리스트(spots) 둘 다 공유된다.
   // 팀 코드가 입력된 기기끼리만 같은 방(rooms/{teamCode}/logs, rooms/{teamCode}/spots)을 보고 쓸 수 있다.
   var FIREBASE_CONFIG = {
-    apiKey: "AIzaSyC-W3A5VWHgagIPzCIQAMjqu1W-Y7EIJfI",
-    authDomain: "rs4-app.firebaseapp.com",
-    projectId: "rs4-app",
-    storageBucket: "rs4-app.firebasestorage.app",
-    messagingSenderId: "399422986107",
-    appId: "1:399422986107:web:fec5b43c7a573d0eb80fde"
+    apiKey: "AIzaSyC-rWdpmlHo23_rmIwklHwDx5tLhYRS1Gs",
+    authDomain: "parking-log-sync-rs4.firebaseapp.com",
+    projectId: "parking-log-sync-rs4",
+    storageBucket: "parking-log-sync-rs4.firebasestorage.app",
+    messagingSenderId: "501204751523",
+    appId: "1:501204751523:web:b56cf30043b02c9bb85b16"
   };
   // 이 기기를 구분하는 값. 같은 팀 코드의 폰 여러 대가 같은 주행 로깅을 같이 추적하는데, 시작하지 않은
   // 폰(follower)이 자기 복사본 전체를 5초마다 클라우드에 올리면, 시작한 폰이 방금 바꾼 상태(정지/휴식/
@@ -1258,17 +1277,14 @@
   // 로깅을 시작한 기기만 한다.
   var DEVICE_ID = (function(){
     try {
-      var d = localStorage.getItem(LS_PREFIX + 'deviceId');
-      if (!d){ d = 'dv_' + Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36); localStorage.setItem(LS_PREFIX + 'deviceId', d); }
+      var d = localStorage.getItem('deviceId');
+      if (!d){ d = 'dv_' + Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36); localStorage.setItem('deviceId', d); }
       return d;
     } catch(e){ return 'dv_' + Math.floor(Math.random()*1e9).toString(36); }
   })();
   function isOwnLog(log){ return !log.deviceId || log.deviceId === DEVICE_ID; }
-  var TEAM_CODE_KEY = LS_PREFIX + 'teamCode';
-  var TEAM_CODE_PROMPTED_KEY = LS_PREFIX + 'teamCodePrompted';
-  var LAST_SSD_KEY = LS_PREFIX + 'lastSSD';
-  var LAST_DRIVER_KEY = LS_PREFIX + 'lastDriver';
-  var LAST_LOTNAME_KEY = LS_PREFIX + 'lastLotName';
+  var TEAM_CODE_KEY = 'teamCode';
+  var TEAM_CODE_PROMPTED_KEY = 'teamCodePrompted';
   var teamCode = null;
   var db = null;
   var roomRef = null;       // rooms/{teamCode}/logs
@@ -1341,9 +1357,9 @@
         '</div>'
       : '';
     var lastSSD = '';
-    try { lastSSD = localStorage.getItem(LAST_SSD_KEY) || ''; } catch(e){}
+    try { lastSSD = localStorage.getItem('lastSSD') || ''; } catch(e){}
     var lastDriver = '';
-    try { lastDriver = localStorage.getItem(LAST_DRIVER_KEY) || ''; } catch(e){}
+    try { lastDriver = localStorage.getItem('lastDriver') || ''; } catch(e){}
     openModal(
       '<h3>' + config.title + '</h3>' +
       nameField +
@@ -1670,7 +1686,7 @@
   function migrateLocalLogsToCloud(){
     // 팀 코드를 처음 설정한 기기에서, 그동안 로컬에만 있던 기록을 한 번 클라우드로 올려서
     // 이후 다른 폰에서도 볼 수 있게 한다 (같은 id로 올리므로 중복 생성되지 않음).
-    var flagKey = LS_PREFIX + 'migratedToCloud_' + teamCode;
+    var flagKey = 'migratedToCloud_' + teamCode;
     var already = false;
     try { already = localStorage.getItem(flagKey) === '1'; } catch(e){}
     if (already || !roomRef) return;
@@ -1802,7 +1818,7 @@
     // 로깅 동기화 때와 마찬가지로, 팀 코드 설정 후 이 기기에 있던 기존 장소들을 한 번만 클라우드로
     // 올린다. 로깅 마이그레이션과 별도 플래그를 써서, 이미 로깅 동기화를 쓰고 있던 기기에서도
     // 장소 체크리스트 마이그레이션이 한 번은 새로 실행되게 한다.
-    var flagKey = LS_PREFIX + 'migratedSpotsToCloud_' + teamCode;
+    var flagKey = 'migratedSpotsToCloud_' + teamCode;
     var already = false;
     try { already = localStorage.getItem(flagKey) === '1'; } catch(e){}
     if (already || !spotsRoomRef) return;
@@ -2500,8 +2516,8 @@
   }
   function startTrip(opts){
     opts = opts || {};
-    if (opts.ssd){ try { localStorage.setItem(LAST_SSD_KEY, opts.ssd); } catch(e){} }
-    if (opts.driver){ try { localStorage.setItem(LAST_DRIVER_KEY, opts.driver); } catch(e){} }
+    if (opts.ssd){ try { localStorage.setItem('lastSSD', opts.ssd); } catch(e){} }
+    if (opts.driver){ try { localStorage.setItem('lastDriver', opts.driver); } catch(e){} }
     // 트립을 시작해도 곧바로 주행 기록(GPS 추적)이 시작되지 않고, "주행 기록 시작"을 직접 눌러야
     // 시작되게 한다(deferTracking) — 출발 준비하는 동안 실수로 기록되는 걸 막기 위함.
     // (Wake Lock 요청은 이제 startLog 안에서 모든 로깅 종류에 공통으로 처리한다.)
@@ -2864,9 +2880,9 @@
   function openTripStartModal(){
     tripModalVehicle = 'LX2';
     var lastSSD = '';
-    try { lastSSD = localStorage.getItem(LAST_SSD_KEY) || ''; } catch(e){}
+    try { lastSSD = localStorage.getItem('lastSSD') || ''; } catch(e){}
     var lastDriver = '';
-    try { lastDriver = localStorage.getItem(LAST_DRIVER_KEY) || ''; } catch(e){}
+    try { lastDriver = localStorage.getItem('lastDriver') || ''; } catch(e){}
     openModal(
       '<h3>로깅 기록 시작</h3>' +
       '<label class="modal-field-label">출발 키로수 (선택)</label>' +
@@ -4938,8 +4954,8 @@
       // SSD 번호는 직전 값이 자동으로 채워지고 선택돼 있어서, 안 바뀌었으면 그냥 "시작"만 누르면 됨.
       // 환경(일반도로/고속도로)도 기본값(일반도로)이 이미 선택돼 있어 한 번의 탭으로 시작 가능.
       openStartModal({ title: '주행 로깅 시작', showName: false, showEnv: true }, function(res){
-        if (res.ssd){ try { localStorage.setItem(LAST_SSD_KEY, res.ssd); } catch(e){} }
-        if (res.driver){ try { localStorage.setItem(LAST_DRIVER_KEY, res.driver); } catch(e){} }
+        if (res.ssd){ try { localStorage.setItem('lastSSD', res.ssd); } catch(e){} }
+        if (res.driver){ try { localStorage.setItem('lastDriver', res.driver); } catch(e){} }
         startLog('road', null, { ssd: res.ssd, driver: res.driver, highway: res.highway });
       });
     });
@@ -4950,13 +4966,13 @@
         return;
       }
       var lastLotName = '';
-      try { lastLotName = localStorage.getItem(LAST_LOTNAME_KEY) || ''; } catch(e){}
+      try { lastLotName = localStorage.getItem('lastLotName') || ''; } catch(e){}
       // 마지막으로 쓴 주차장 이름을 기본값으로 채워둠 — 같은 주차장이면 바로 "시작"만 누르면 되고,
       // 다른 주차장으로 바뀌었으면 입력창이 자동 선택된 상태라 바로 새 이름을 타이핑해서 덮어쓰면 됨.
       openStartModal({ title: '주차장 로깅 시작', showName: true, nameDefault: lastLotName, showAddress: true, showEnv: false }, function(res){
-        if (res.name){ try { localStorage.setItem(LAST_LOTNAME_KEY, res.name); } catch(e){} }
-        if (res.ssd){ try { localStorage.setItem(LAST_SSD_KEY, res.ssd); } catch(e){} }
-        if (res.driver){ try { localStorage.setItem(LAST_DRIVER_KEY, res.driver); } catch(e){} }
+        if (res.name){ try { localStorage.setItem('lastLotName', res.name); } catch(e){} }
+        if (res.ssd){ try { localStorage.setItem('lastSSD', res.ssd); } catch(e){} }
+        if (res.driver){ try { localStorage.setItem('lastDriver', res.driver); } catch(e){} }
         startLog('parking_lot', res.name, { ssd: res.ssd, driver: res.driver, manualAddress: res.address });
       });
     });
